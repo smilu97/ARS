@@ -24,5 +24,6 @@ class ARSConfig:
 
       self.step_size = step_size
       self.num_directions = num_directions
+      self.num_top_directions = num_top_directions
       self.exploration_noise = exploration_noise
 
