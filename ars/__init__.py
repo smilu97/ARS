@@ -1,9 +1,10 @@
 # author: smilu97
 
+import ray
 import gym
 import numpy as np
 
-from typing import Callable
+from typing import Callable, List
 
 from ars.config import ARSConfig
 from ars.policy import Policy
@@ -13,7 +14,7 @@ class ARS:
   Reference: https://arxiv.org/pdf/1803.07055.pdf
   '''
 
-  def __init__(self, evaluator: Callable[[np.ndarray], float], init_params: np.ndarray, config: ARSConfig):
+  def __init__(self, evaluator: Callable[[np.ndarray], List[float]], init_params: np.ndarray, config: ARSConfig):
     self.evaluator = evaluator
     self.config = config
 
@@ -30,8 +31,8 @@ class ARS:
     diffs = self._select_random_diff(num_directions)
 
     # Evaluate the rewards to get from exploring
-    rewards = [[self._evaluate(self.params + diff), self._evaluate(self.params - diff)] for diff in diffs]
-    rewards = np.array(rewards, dtype=np.float64)
+    params = np.concatenate([diffs, -diffs], axis=0) + self.params
+    rewards = np.array(self.evaluator(params), dtype=np.float64).reshape((2, -1)).transpose()
 
     # Only b directions survive by their reward
     sort_keys    = [-max(r[0], r[1]) for r in rewards]
@@ -51,11 +52,7 @@ class ARS:
     self.j += 1
   
   def evaluate(self):
-    return self._evaluate(self.params)
-  
-  def _evaluate(self, params: np.ndarray, n: int=10):
-    rewards = [self.evaluator(params) for _ in range(n)]
-    return np.mean(rewards)
+    return self.evaluator([self.params])[0]
   
   def _select_random_diff(self, n: int):
     return np.random.randn(n * self.param_size).reshape((n, self.param_size)) * self.config.exploration_noise
