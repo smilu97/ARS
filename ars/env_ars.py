@@ -59,11 +59,16 @@ class EnvARS(ARS):
     sqr_mean_states = 0
 
     def evaluator(params: np.ndarray):
+      nonlocal len_mean_states
+      nonlocal mean_states
+      nonlocal sqr_mean_states
+
       results = []
       new_states = []
       for i in range(0, len(params), num_cpus):
         sz = min(len(params) - i, num_cpus)
-        var_states = sqr_mean_states - np.square(mean_states)
+        var_states = sqr_mean_states - np.square(mean_states) \
+          if len_mean_states > 100 else 1.0
 
         refs = [self.actors[j].evaluate_n_times.remote(
           params[i+j],
@@ -77,15 +82,16 @@ class EnvARS(ARS):
         results += [ray.get(x) for x in refs]
       
       # Update mean_states and sqr_mean_states
-      new_states = np.array(new_states)
-      new_mean_states = np.mean(new_states, axis=0)
-      new_sqr_mean_states = np.mean(np.square(new_states), axis=0)
+      if len(new_states) > 0:
+        new_states = np.array(new_states)
+        new_mean_states = np.mean(new_states, axis=0)
+        new_sqr_mean_states = np.mean(np.square(new_states), axis=0)
 
-      ratio_prev = (len_mean_states / (len_mean_states + len(new_states)))
-      ratio_next = (len(new_states) / (len_mean_states + len(new_states)))
-      mean_states = mean_states * raio_prev + new_mean_states * ratio_next
-      sqr_mean_states = sqr_mean_states * raio_prev + new_sqr_mean_states * ratio_next
-      len_mean_states += len(new_states)
+        ratio_prev = (len_mean_states / (len_mean_states + len(new_states)))
+        ratio_next = (len(new_states) / (len_mean_states + len(new_states)))
+        mean_states = mean_states * raio_prev + new_mean_states * ratio_next
+        sqr_mean_states = sqr_mean_states * raio_prev + new_sqr_mean_states * ratio_next
+        len_mean_states += len(new_states)
 
       return results
 
